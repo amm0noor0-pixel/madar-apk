@@ -43,19 +43,9 @@ jobs:
       - name: Prepare icon and splash from uploaded logo
         run: |
           mkdir -p assets
-          echo "Uploaded logo info:"
-          file logo.png
-          identify logo.png || true
-          
-          # أيقونة 1024x1024 بخلفية شفافة
           convert logo.png -resize 1024x1024 -background none -gravity center -extent 1024x1024 assets/icon.png
-          
-          # شاشة البداية: خلفية كحلية #1e3a5f مع الشعار في الوسط
           convert -size 2732x2732 xc:"#1e3a5f" \( logo.png -resize 900x900 \) -gravity center -composite assets/splash.png
-          
-          echo "Generated assets:"
           ls -la assets/
-          file assets/icon.png assets/splash.png
 
       - name: Setup package.json
         run: |
@@ -70,6 +60,7 @@ jobs:
       - name: Install Capacitor
         run: |
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npm install @capacitor/share@6 @capacitor/filesystem@6
           npm install --save-dev @capacitor/assets@3
 
       - name: Create Capacitor config
@@ -85,6 +76,14 @@ jobs:
             },
             "server": {
               "androidScheme": "https"
+            },
+            "plugins": {
+              "Share": {
+                "androidScheme": "content"
+              },
+              "Filesystem": {
+                "androidScheme": "content"
+              }
             }
           }
           EOF
