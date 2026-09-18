@@ -22,14 +22,21 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Create web files
+      - name: Download web files from live app
         run: |
           mkdir -p www
-          cat > www/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html><head><meta charset="utf-8"></head>
-          <body style="margin:0"><p>Loading...</p></body></html>
-          EOF
+          wget -q -O www/index.html https://madar-sys.ai.studio/
+          mkdir -p www/assets
+          wget -q -O www/assets/icon.svg https://madar-sys.ai.studio/assets/icon.svg || true
+          wget -q -O www/assets/icon-192.png https://madar-sys.ai.studio/assets/icon-192.png || true
+          wget -q -O www/assets/icon-512.png https://madar-sys.ai.studio/assets/icon-512.png || true
+          wget -q -O www/manifest.json https://madar-sys.ai.studio/manifest.json || true
+          wget -q -O www/service-worker.js https://madar-sys.ai.studio/service-worker.js || true
+          echo "Downloaded files:"
+          ls -la www/
+          ls -la www/assets/ 2>/dev/null || true
+          echo "index.html size:"
+          wc -c www/index.html
 
       - name: Setup package.json
         run: |
@@ -45,20 +52,19 @@ jobs:
         run: |
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
 
-      - name: Create Capacitor config
+      - name: Create Capacitor config (LOCAL files, offline-first)
         run: |
           cat > capacitor.config.json << 'EOF'
           {
             "appId": "ai.studio.madar_sys",
             "appName": "مدار",
             "webDir": "www",
-            "server": {
-              "url": "https://madar-sys.ai.studio",
-              "androidScheme": "https",
-              "cleartext": true
-            },
             "android": {
-              "allowMixedContent": true
+              "allowMixedContent": true,
+              "webContentsDebuggingEnabled": false
+            },
+            "server": {
+              "androidScheme": "https"
             }
           }
           EOF
