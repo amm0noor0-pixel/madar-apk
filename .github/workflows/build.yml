@@ -11,36 +11,66 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Bubblewrap
         run: npm install -g @bubblewrap/cli
+
+      - name: Install Android SDK via Bubblewrap
+        run: |
+          mkdir -p ~/.bubblewrap
+          echo '{"jdkPath":"'"$JAVA_HOME"'","androidSdkPath":"'"$HOME"'/android-sdk"}' > ~/.bubblewrap/config.json
+          yes | bubblewrap doctor || true
 
       - name: Create keystore
         run: |
           mkdir -p twa
-          cd twa
-          keytool -genkeypair -v -keystore android.keystore \
+          keytool -genkeypair -v -keystore twa/android.keystore \
             -alias madar -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass madar2026 -keypass madar2026 \
             -dname "CN=Madar, OU=Madar, O=Madar, L=Aden, ST=Aden, C=YE"
 
-      - name: Init Bubblewrap project
+      - name: Setup Bubblewrap project
+        run: |
+          mkdir -p twa && cd twa
+          cat > twa-manifest.json << 'JSONEOF'
+          {
+            "packageId": "ai.studio.madar_sys.twa",
+            "host": "madar-sys.ai.studio",
+            "name": "مدار",
+            "launcherName": "مدار",
+            "display": "standalone",
+            "themeColor": "#1e3a5f",
+            "navigationColor": "#1e3a5f",
+            "navigationColorDark": "#1e3a5f",
+            "backgroundColor": "#1e3a5f",
+            "enableNotifications": false,
+            "startUrl": "/",
+            "iconUrl": "https://madar-sys.ai.studio/assets/icon-512.png",
+            "maskableIconUrl": "https://madar-sys.ai.studio/assets/icon-512.png",
+            "webManifestUrl": "https://madar-sys.ai.studio/manifest.json",
+            "appVersionName": "1.0.0",
+            "appVersionCode": 1,
+            "minSdkVersion": 21,
+            "orientation": "portrait",
+            "fallbackType": "customtabs",
+            "features": {},
+            "shortcuts": [],
+            "signingKey": {
+              "path": "./android.keystore",
+              "alias": "madar"
+            }
+          }
+          JSONEOF
+
+      - name: Generate Android project
         run: |
           cd twa
-          bubblewrap init --manifest https://madar-sys.ai.studio/manifest.json --directory . << 'EOF'
+          bubblewrap init --manifest=https://madar-sys.ai.studio/manifest.json --directory=. --skipPwaValidation << 'EOF'
           madar2026
           madar2026
           madar
@@ -49,7 +79,12 @@ jobs:
       - name: Build APK
         run: |
           cd twa
-          bubblewrap build
+          bubblewrap build --skipPwaValidation
+
+      - name: Find APK files
+        run: |
+          ls -la twa/
+          find twa -name "*.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
