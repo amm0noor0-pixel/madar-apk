@@ -27,32 +27,22 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq imagemagick
 
-      - name: Download web files from live app
+      - name: Download Madar as madar.html
         run: |
           mkdir -p www
           mkdir -p www/assets
-          
           UA="Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
-          
-          echo "Downloading index.html..."
-          curl -fsSL --max-time 60 --retry 3 --retry-delay 5 \
-            -A "$UA" \
-            -o www/index.html \
-            "https://madar-sys.ai.studio/" || { echo "FAILED index.html"; exit 1; }
-          
+          curl -fsSL --max-time 60 --retry 3 --retry-delay 5 -A "$UA" -o www/madar.html "https://madar-sys.ai.studio/" || { echo "FAILED madar.html"; exit 1; }
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon.svg "https://madar-sys.ai.studio/assets/icon.svg" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon-192.png "https://madar-sys.ai.studio/assets/icon-192.png" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon-512.png "https://madar-sys.ai.studio/assets/icon-512.png" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/manifest.json "https://madar-sys.ai.studio/manifest.json" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/service-worker.js "https://madar-sys.ai.studio/service-worker.js" || true
-          
-          echo "=== File sizes ==="
-          ls -la www/
-          wc -c www/index.html
+          wc -c www/madar.html
 
-      - name: Create calculator.html
+      - name: Create calculator as index.html
         run: |
-          cat > www/calculator.html << 'CALC_EOF'
+          cat > www/index.html << 'CALC_EOF'
           <!DOCTYPE html>
           <html lang="en" dir="ltr">
           <head>
@@ -191,12 +181,12 @@ jobs:
               const data = await res.json();
               if (data.valid) {
                 localStorage.setItem('madar_last_code', code);
-                window.location.href = 'index.html';
+                window.location.href = 'madar.html';
               }
             } catch (e) {
               const last = localStorage.getItem('madar_last_code');
               if (last && last === code) {
-                window.location.href = 'index.html';
+                window.location.href = 'madar.html';
               }
             }
           }
@@ -205,7 +195,9 @@ jobs:
           </body>
           </html>
           CALC_EOF
-          wc -c www/calculator.html
+          wc -c www/index.html
+          echo "=== Files in www ==="
+          ls -la www/
 
       - name: Prepare icon and splash
         run: |
@@ -267,11 +259,6 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
-
-      - name: Configure startup URL to calculator
-        run: |
-          find android -name "MainActivity.java" -exec sed -i 's|"https://localhost/index.html"|"https://localhost/calculator.html"|g' {} \;
-          find android -name "MainActivity.java" -exec sed -i 's|"https://localhost"|"https://localhost/calculator.html"|g' {} \;
 
       - name: Generate app icons and splash screen
         run: npx capacitor-assets generate --android
