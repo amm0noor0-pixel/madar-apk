@@ -40,18 +40,171 @@ jobs:
             -o www/index.html \
             "https://madar-sys.ai.studio/" || { echo "FAILED index.html"; exit 1; }
           
-          echo "Downloading assets (optional)..."
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon.svg "https://madar-sys.ai.studio/assets/icon.svg" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon-192.png "https://madar-sys.ai.studio/assets/icon-192.png" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon-512.png "https://madar-sys.ai.studio/assets/icon-512.png" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/manifest.json "https://madar-sys.ai.studio/manifest.json" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/service-worker.js "https://madar-sys.ai.studio/service-worker.js" || true
           
-          cp calculator.html www/calculator.html
-          
           echo "=== File sizes ==="
           ls -la www/
           wc -c www/index.html
+
+      - name: Create calculator.html
+        run: |
+          cat > www/calculator.html << 'CALC_EOF'
+          <!DOCTYPE html>
+          <html lang="en" dir="ltr">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+          <title>Calculator</title>
+          <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+          html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+          body { background: #1a1a1a; display: flex; align-items: center; justify-content: center; }
+          .calc { width: 100%; height: 100%; max-width: 480px; background: #1a1a1a; display: flex; flex-direction: column; }
+          .display { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; padding: 20px 24px; min-height: 30vh; }
+          .history { font-size: 18px; color: #666; min-height: 24px; margin-bottom: 8px; word-break: break-all; text-align: right; }
+          .current { font-size: 64px; color: #fff; font-weight: 300; word-break: break-all; text-align: right; line-height: 1.1; }
+          .buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #333; padding: 1px; }
+          button { height: 80px; border: none; font-size: 28px; font-weight: 400; cursor: pointer; background: #2c2c2c; color: #fff; transition: background 0.1s; }
+          button:active { background: #3a3a3a; }
+          button.op { background: #ff9500; color: #fff; font-weight: 500; }
+          button.op:active { background: #cc7700; }
+          button.fn { background: #505050; color: #fff; }
+          button.fn:active { background: #6a6a6a; }
+          button.zero { grid-column: span 2; }
+          </style>
+          </head>
+          <body>
+          <div class="calc">
+            <div class="display">
+              <div class="history" id="history"></div>
+              <div class="current" id="current">0</div>
+            </div>
+            <div class="buttons">
+              <button class="fn" onclick="clearAll()">AC</button>
+              <button class="fn" onclick="toggleSign()">+/-</button>
+              <button class="fn" onclick="percent()">%</button>
+              <button class="op" onclick="op('/')">÷</button>
+              <button onclick="num('7')">7</button>
+              <button onclick="num('8')">8</button>
+              <button onclick="num('9')">9</button>
+              <button class="op" onclick="op('*')">×</button>
+              <button onclick="num('4')">4</button>
+              <button onclick="num('5')">5</button>
+              <button onclick="num('6')">6</button>
+              <button class="op" onclick="op('-')">−</button>
+              <button onclick="num('1')">1</button>
+              <button onclick="num('2')">2</button>
+              <button onclick="num('3')">3</button>
+              <button class="op" onclick="op('+')">+</button>
+              <button class="zero" onclick="num('0')">0</button>
+              <button onclick="num('.')">.</button>
+              <button class="op" onclick="equals()">=</button>
+            </div>
+          </div>
+          <script>
+          let currentInput = '0';
+          let previousValue = null;
+          let pendingOp = null;
+          let justEvaluated = false;
+          const el = {
+            current: document.getElementById('current'),
+            history: document.getElementById('history')
+          };
+          function render() {
+            el.current.textContent = currentInput;
+            if (previousValue !== null && pendingOp) {
+              el.history.textContent = previousValue + ' ' + symbol(pendingOp);
+            } else {
+              el.history.textContent = '';
+            }
+          }
+          function symbol(op) {
+            return { '+': '+', '-': '−', '*': '×', '/': '÷' }[op] || op;
+          }
+          function num(n) {
+            if (justEvaluated) { currentInput = '0'; justEvaluated = false; }
+            if (n === '.' && currentInput.includes('.')) return;
+            if (currentInput === '0' && n !== '.') currentInput = n;
+            else currentInput += n;
+            render();
+          }
+          function op(o) {
+            if (pendingOp && !justEvaluated) compute();
+            previousValue = parseFloat(currentInput);
+            pendingOp = o;
+            currentInput = '0';
+            justEvaluated = false;
+            render();
+          }
+          function compute() {
+            if (previousValue === null || !pendingOp) return;
+            const a = previousValue;
+            const b = parseFloat(currentInput);
+            let result = 0;
+            switch (pendingOp) {
+              case '+': result = a + b; break;
+              case '-': result = a - b; break;
+              case '*': result = a * b; break;
+              case '/': result = b === 0 ? 0 : a / b; break;
+            }
+            currentInput = String(parseFloat(result.toFixed(10)));
+            previousValue = null;
+            pendingOp = null;
+          }
+          async function equals() {
+            compute();
+            justEvaluated = true;
+            el.history.textContent = '';
+            render();
+            await tryUnlock();
+          }
+          function clearAll() {
+            currentInput = '0';
+            previousValue = null;
+            pendingOp = null;
+            justEvaluated = false;
+            render();
+          }
+          function toggleSign() {
+            if (currentInput === '0') return;
+            if (currentInput.startsWith('-')) currentInput = currentInput.slice(1);
+            else currentInput = '-' + currentInput;
+            render();
+          }
+          function percent() {
+            currentInput = String(parseFloat(currentInput) / 100);
+            render();
+          }
+          async function tryUnlock() {
+            const code = currentInput.trim();
+            if (!code || code.length < 3) return;
+            try {
+              const res = await fetch('https://madar-sys.ai.studio/api/verify-unlock-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+              });
+              const data = await res.json();
+              if (data.valid) {
+                localStorage.setItem('madar_last_code', code);
+                window.location.href = 'index.html';
+              }
+            } catch (e) {
+              const last = localStorage.getItem('madar_last_code');
+              if (last && last === code) {
+                window.location.href = 'index.html';
+              }
+            }
+          }
+          render();
+          </script>
+          </body>
+          </html>
+          CALC_EOF
           wc -c www/calculator.html
 
       - name: Prepare icon and splash
