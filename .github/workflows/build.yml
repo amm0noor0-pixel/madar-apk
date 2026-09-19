@@ -196,27 +196,24 @@ jobs:
           </html>
           CALC_EOF
           wc -c www/index.html
-          echo "=== Files in www ==="
           ls -la www/
 
-      - name: Prepare icon and splash
+      - name: Prepare icon and splash from uploaded calculator icon
         run: |
           mkdir -p assets
-          convert -size 1024x1024 xc:"#2563eb" \
-            -fill white -stroke white -strokewidth 8 -draw "roundrectangle 250,280 774,744 40,40" \
-            -fill "#2563eb" -stroke none \
-            -draw "circle 380,440 380,420" \
-            -draw "circle 512,440 512,420" \
-            -draw "circle 644,440 644,420" \
-            -draw "circle 380,560 380,540" \
-            -draw "circle 512,560 512,540" \
-            -draw "circle 644,560 644,540" \
-            -draw "circle 380,680 380,660" \
-            -draw "circle 512,680 512,660" \
-            -draw "circle 644,680 644,660" \
-            assets/icon.png
+          echo "=== Input icon info ==="
+          file calculator-icon.png
+          identify calculator-icon.png || true
+          
+          # نجعل الصورة مربعة مع خلفية بيضاء إذا كانت غير مربعة
+          convert calculator-icon.png -resize 1024x1024 -background white -gravity center -extent 1024x1024 assets/icon.png
+          
+          # شاشة البداية: خلفية كحلية + الأيقونة في الوسط
           convert -size 2732x2732 xc:"#1e3a5f" \( assets/icon.png -resize 900x900 \) -gravity center -composite assets/splash.png
+          
+          echo "=== Generated assets ==="
           ls -la assets/
+          file assets/icon.png assets/splash.png
 
       - name: Setup package.json
         run: |
