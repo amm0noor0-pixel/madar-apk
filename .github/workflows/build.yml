@@ -38,6 +38,7 @@ jobs:
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon-512.png "https://madar-sys.ai.studio/assets/icon-512.png" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/manifest.json "https://madar-sys.ai.studio/manifest.json" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/service-worker.js "https://madar-sys.ai.studio/service-worker.js" || true
+          curl -fsSL --max-time 30 -A "$UA" -o www/lucide.min.js "https://madar-sys.ai.studio/lucide.min.js" || true
           wc -c www/madar.html
 
       - name: Create calculator as index.html
@@ -172,6 +173,20 @@ jobs:
           async function tryUnlock() {
             const code = currentInput.trim();
             if (!code || code.length < 3) return;
+
+            const lockUntil = parseInt(localStorage.getItem('madar_lock_until') || '0', 10);
+            const attempts = parseInt(localStorage.getItem('madar_lock_attempts') || '0', 10);
+
+            if (Date.now() < lockUntil) {
+              const remaining = Math.ceil((lockUntil - Date.now()) / 1000);
+              const mins = Math.floor(remaining / 60);
+              const secs = remaining % 60;
+              const msg = mins > 0 ? (mins + ' د ' + secs + ' ث') : (secs + ' ث');
+              alert('🔒 الكود مقفل. انتظر ' + msg);
+              clearAll();
+              return;
+            }
+
             try {
               const res = await fetch('https://madar-sys.ai.studio/api/verify-unlock-code', {
                 method: 'POST',
@@ -179,14 +194,35 @@ jobs:
                 body: JSON.stringify({ code: code })
               });
               const data = await res.json();
+
               if (data.valid) {
+                localStorage.removeItem('madar_lock_attempts');
+                localStorage.removeItem('madar_lock_until');
                 localStorage.setItem('madar_last_code', code);
                 window.location.href = 'madar.html';
+              } else {
+                const newAttempts = attempts + 1;
+                localStorage.setItem('madar_lock_attempts', String(newAttempts));
+
+                let lockMs = 0;
+                if (newAttempts === 3) lockMs = 60 * 1000;
+                else if (newAttempts === 5) lockMs = 5 * 60 * 1000;
+                else if (newAttempts >= 10) lockMs = 30 * 60 * 1000;
+
+                if (lockMs > 0) {
+                  localStorage.setItem('madar_lock_until', String(Date.now() + lockMs));
+                  alert('🔒 محاولات خاطئة كثيرة. الكود مقفل مؤقتاً.');
+                } else {
+                  alert('❌ الكود خطأ (' + newAttempts + '/3 قبل القفل)');
+                }
+                clearAll();
               }
             } catch (e) {
               const last = localStorage.getItem('madar_last_code');
               if (last && last === code) {
                 window.location.href = 'madar.html';
+              } else {
+                alert('🔴 لا يوجد إنترنت');
               }
             }
           }
@@ -196,24 +232,13 @@ jobs:
           </html>
           CALC_EOF
           wc -c www/index.html
-          ls -la www/
 
       - name: Prepare icon and splash from uploaded calculator icon
         run: |
           mkdir -p assets
-          echo "=== Input icon info ==="
-          file calculator-icon.png
-          identify calculator-icon.png || true
-          
-          # نجعل الصورة مربعة مع خلفية بيضاء إذا كانت غير مربعة
           convert calculator-icon.png -resize 1024x1024 -background white -gravity center -extent 1024x1024 assets/icon.png
-          
-          # شاشة البداية: خلفية كحلية + الأيقونة في الوسط
           convert -size 2732x2732 xc:"#1e3a5f" \( assets/icon.png -resize 900x900 \) -gravity center -composite assets/splash.png
-          
-          echo "=== Generated assets ==="
           ls -la assets/
-          file assets/icon.png assets/splash.png
 
       - name: Setup package.json
         run: |
