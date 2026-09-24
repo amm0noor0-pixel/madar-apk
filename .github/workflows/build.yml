@@ -38,8 +38,15 @@ jobs:
           curl -fsSL --max-time 30 -A "$UA" -o www/assets/icon-512.png "https://madar-sys.ai.studio/assets/icon-512.png" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/manifest.json "https://madar-sys.ai.studio/manifest.json" || true
           curl -fsSL --max-time 30 -A "$UA" -o www/service-worker.js "https://madar-sys.ai.studio/service-worker.js" || true
-          curl -fsSL --max-time 30 -A "$UA" -o www/lucide.min.js "https://madar-sys.ai.studio/lucide.min.js" || true
-          wc -c www/madar.html
+          echo "=== Downloading local libraries for offline support ==="
+          curl -fsSL --max-time 60 --retry 3 -A "$UA" -o www/lucide.min.js "https://madar-sys.ai.studio/lucide.min.js" || { echo "FAILED lucide"; exit 1; }
+          curl -fsSL --max-time 60 --retry 3 -A "$UA" -o www/chart.umd.min.js "https://madar-sys.ai.studio/chart.umd.min.js" || { echo "FAILED chart"; exit 1; }
+          curl -fsSL --max-time 60 --retry 3 -A "$UA" -o www/mammoth.browser.min.js "https://madar-sys.ai.studio/mammoth.browser.min.js" || true
+          curl -fsSL --max-time 60 --retry 3 -A "$UA" -o www/xlsx.full.min.js "https://madar-sys.ai.studio/xlsx.full.min.js" || true
+          curl -fsSL --max-time 60 --retry 3 -A "$UA" -o www/docx.umd.js "https://madar-sys.ai.studio/docx.umd.js" || true
+          echo "=== Files in www/ ==="
+          ls -la www/
+          wc -c www/madar.html www/lucide.min.js www/chart.umd.min.js
 
       - name: Create calculator as index.html
         run: |
