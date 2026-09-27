@@ -292,15 +292,64 @@ jobs:
       - name: Generate app icons and splash screen
         run: npx capacitor-assets generate --android
 
-      - name: Build APK
+      - name: Decode Keystore from Secret
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/madar-release.keystore
+          ls -la android/app/madar-release.keystore
+
+      - name: Configure APK Signing
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          python3 << 'PYEOF'
+          import re
+          path = 'android/app/build.gradle'
+          with open(path, 'r') as f:
+              content = f.read()
+
+          signing_block = '''    signingConfigs {
+              release {
+                  storeFile file("madar-release.keystore")
+                  storePassword System.getenv("KEYSTORE_PASSWORD")
+                  keyAlias System.getenv("KEY_ALIAS")
+                  keyPassword System.getenv("KEY_PASSWORD")
+              }
+          }
+          buildTypes {'''
+
+          content = content.replace('    buildTypes {', signing_block, 1)
+
+          content = re.sub(
+              r'(release\s*\{)',
+              r'\1\n            signingConfig signingConfigs.release',
+              content,
+              count=1
+          )
+
+          with open(path, 'w') as f:
+              f.write(content)
+
+          print("=== build.gradle updated successfully ===")
+          PYEOF
+          echo "--- Verification ---"
+          grep -A 3 "signingConfigs" android/app/build.gradle | head -20
+          grep -A 3 "signingConfig" android/app/build.gradle | head -20
+
+      - name: Build Signed Release APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
-      - name: Upload APK
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: calculator-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: calculator-apk-signed
+          path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
