@@ -305,11 +305,14 @@ jobs:
         run: |
           python3 << 'PYEOF'
           import re
+
           path = 'android/app/build.gradle'
           with open(path, 'r') as f:
               content = f.read()
 
-          signing_block = '''    signingConfigs {
+          content = re.sub(r'signingConfigs\s*\{[^}]*\}\s*', '', content, flags=re.DOTALL)
+
+          signing_block = '''signingConfigs {
               release {
                   storeFile file("madar-release.keystore")
                   storePassword System.getenv("KEYSTORE_PASSWORD")
@@ -317,25 +320,30 @@ jobs:
                   keyPassword System.getenv("KEY_PASSWORD")
               }
           }
+
           buildTypes {'''
 
-          content = content.replace('    buildTypes {', signing_block, 1)
+          content = content.replace('buildTypes {', signing_block, 1)
 
-          content = re.sub(
-              r'(release\s*\{)',
-              r'\1\n            signingConfig signingConfigs.release',
-              content,
-              count=1
-          )
+          bt_idx = content.find('buildTypes {')
+          if bt_idx == -1:
+              raise SystemExit("ERROR: buildTypes not found")
+
+          release_idx = content.find('release {', bt_idx)
+          if release_idx == -1:
+              raise SystemExit("ERROR: release block not found inside buildTypes")
+
+          insert_pos = release_idx + len('release {')
+          content = content[:insert_pos] + '\n            signingConfig signingConfigs.release' + content[insert_pos:]
 
           with open(path, 'w') as f:
               f.write(content)
 
-          print("=== build.gradle updated successfully ===")
+          print("=== Signing configured successfully ===")
           PYEOF
           echo "--- Verification ---"
-          grep -A 3 "signingConfigs" android/app/build.gradle | head -20
-          grep -A 3 "signingConfig" android/app/build.gradle | head -20
+          grep -A 8 "signingConfigs" android/app/build.gradle | head -12
+          grep -B 1 -A 3 "signingConfig signingConfigs" android/app/build.gradle
 
       - name: Build Signed Release APK
         env:
